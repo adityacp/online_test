@@ -141,6 +141,15 @@ To install this app follow the steps below:
 
    ::
 
+       $ pip install -r requirements/requirements-py2.txt # For Python 2
+
+       $ pip install -r requirements/requirements-py3.txt # For Python 3 (recommended)
+
+
+2. Run:
+
+   ::
+
        $ python manage.py makemigrations yaksh
 
        $ python manage.py migrate yaksh
