@@ -10,7 +10,7 @@ services:
 before_install:
   - sudo apt-get update -qq
   - sudo apt-get install -y scilab
-  - sudo apt-get install python-dev default-libmysqlclient-dev
+  - sudo apt-get install python-dev libmysqlclient-dev
   - "export DISPLAY=:99.0"
 
 # command to install dependencies
