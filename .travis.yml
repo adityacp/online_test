@@ -15,6 +15,7 @@ before_install:
 # command to install dependencies
 install:
   - pip install -r requirements/requirements-common.txt
+  - pip install -r requirements/requirements-py3.txt
   - pip install codecov
   - python setup.py develop
 
