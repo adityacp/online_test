@@ -51,7 +51,19 @@ $(document).ready(function(){
 
     $(function() {
         tinymce.init({ 
+            mode : "specific_textareas",
             selector: 'textarea#email_body',
+            max_height: 200,
+            height: 200
+        });
+        tinymce.init({ 
+            mode : "specific_textareas",
+            selector: 'textarea#description',
+            setup : function(ed) {
+                  ed.on('change', function(e) {
+                     tinymce.triggerSave();
+                  });
+            },
             max_height: 200,
             height: 200
         });

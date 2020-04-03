@@ -1,0 +1,62 @@
+<!-- Send Mail -->
+{% if is_notify %}
+<div id="send-mail">
+    {% if enrolled %}
+    <form action="{% url 'yaksh:send_notifications' course.id %}" method="post" id="send_mail_form">
+        {% csrf_token %}
+        <div class="card">
+            <div class="card-body">
+                <textarea name="summary" class="form-control" id="summary" placeholder="Notification Summary" required></textarea>
+                <br><br>
+                <textarea name="description" id="description" placeholder="Notification Description" required></textarea><br>
+                Select Notification Type: 
+                <select name="msg_type" class="custom-select" required>
+                    <option value="info">Information</option>
+                    <option value="success">Success</option>
+                    <option value="warning">Warning</option>
+                    <option value="danger">Danger</option>
+                </select>
+            </div>
+        </div>
+        <br>
+        <input type="checkbox" class="send_check"/>&nbsp;
+        <font size="5">Select all</font>
+        <div id="sender_list">
+            <table id="mail_table" class="tablesorter table table-striped table-responsive-sm course-detail" data-sortlist="[1,0]">
+                <thead>
+                    <th></th>
+                    <th>Full Name&nbsp;<i class="fa fa-sort"></i></th>
+                    <th>Email&nbsp;<i class="fa fa-sort"></i></th>
+                    <th>Roll Number&nbsp;<i class="fa fa-sort"></i></th>
+                    <th>Institute&nbsp;<i class="fa fa-sort"></i></th>
+                </thead>
+                <tbody>
+                    {% for enroll in enrolled %}
+                        <tr>
+                        <td>
+                            {{ forloop.counter }}.
+                            <input type="checkbox" name="check" value="{{ enroll.id }}">
+                        </td>
+                        <td> {{ enroll.get_full_name|title }} </td>
+                        <td> {{enroll.email}}</td>
+                        {% with enroll.profile as user_profile %}
+                            <td> {{user_profile.roll_number}}</td>
+                            <td> {{user_profile.institute}}</td>
+                        {% endwith %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <button class="btn btn-success btn-lg" type="submit" name='send_mail' value='send_mail' id="send_mail">
+                Send Notification
+            </button>
+        </div>
+    </form>
+    {% else %}
+        <center>
+            <span class="badge badge-warning"><big> No enrolled students yet</big></span>
+        </center>
+    {% endif %}
+</div>
+<!-- End send mail -->
+{% endif %}

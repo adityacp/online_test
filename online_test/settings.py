@@ -45,6 +45,7 @@ INSTALLED_APPS = (
     'taggit',
     'social_django',
     'grades',
+    'notifications_plugin'
 )
 
 MIDDLEWARE = (

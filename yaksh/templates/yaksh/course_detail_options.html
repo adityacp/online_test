@@ -39,4 +39,9 @@
         Current Teachers/TAs
         </a>
     </li>
+    <li class="nav-item">
+        <a href="{% url 'yaksh:send_notifications' course.id %}" class="nav-link list-group-item {% if is_notify %} active {% endif %}" title="Send notifications to course students" data-placement="top" data-toggle="tooltip">
+            Send Notifications
+        </a>
+    </li>
 </ul>

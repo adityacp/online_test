@@ -53,6 +53,8 @@ from .send_emails import (send_user_mail,
                           generate_activation_key, send_bulk_mail)
 from .decorators import email_verified, has_profile
 
+from notifications_plugin.models import NotificationMessage, Notification
+
 
 def my_redirect(url):
     """An overridden redirect to deal with URL_ROOT-ing. See settings.py
@@ -169,7 +171,9 @@ def quizlist_user(request, enrolled=None, msg=None):
     """Show All Quizzes that is available to logged-in user."""
     user = request.user
     courses_data = []
-
+    notifications = Notification.objects.get_unread_receiver_notifications(
+        user.id
+    ).count()
     if request.method == "POST":
         course_code = request.POST.get('course_code')
         hidden_courses = Course.objects.get_hidden_courses(code=course_code)
@@ -201,7 +205,7 @@ def quizlist_user(request, enrolled=None, msg=None):
     messages.info(request, msg)
     context = {
         'user': user, 'courses': courses_data,
-        'title': title
+        'title': title, 'notifications_count': notifications
     }
 
     return my_render_to_response(request, "yaksh/quizzes_user.html", context)
@@ -3190,3 +3194,71 @@ def download_course_progress(request, course_id):
     for student in stud_details:
         writer.writerow(student)
     return response
+
+
+@login_required
+@email_verified
+def send_notifications(request, course_id):
+    user = request.user
+    if not is_moderator(user):
+        raise Http404('You are not allowed to view this page')
+
+    course = get_object_or_404(Course, pk=course_id)
+    if not course.is_creator(user) and not course.is_teacher(user):
+        raise Http404('This course does not belong to you')
+
+    message = None
+    if request.method == 'POST':
+        students = request.POST.getlist('check')
+        if request.POST.get('send_mail') == 'send_mail':
+            summary = request.POST.get('summary')
+            description = request.POST.get('description')
+            msg_type = request.POST.get('msg_type', "info")
+            nm = NotificationMessage.objects.add_single_message(
+                    user.id, summary, description, msg_type
+                )
+            added_nm = NotificationMessage.objects.get(uid=nm.uid).id
+            Notification.objects.add_bulk_user_notifications(
+                students, added_nm
+            )
+            messages.success(request, "Created notifcations successfully")
+    context = {
+        'course': course, 'message': message,
+        'enrolled': course.get_enrolled(), 'is_notify': True
+    }
+    return my_render_to_response(request, 'yaksh/course_detail.html', context)
+
+
+@login_required
+@email_verified
+def view_notifications(request):
+    user = request.user
+    notifcations = Notification.objects.get_unread_receiver_notifications(
+        user.id
+    )
+    if is_moderator(user):
+        template = "manage.html"
+    else:
+        template = "user.html"
+    context = {"template": template, "notifications": notifcations,
+               "current_date_time": timezone.now()}
+    return my_render_to_response(
+        request, 'yaksh/view_notifications.html', context
+    )
+
+
+@login_required
+@email_verified
+def mark_notification(request, message_uid=None):
+    user = request.user
+    if message_uid:
+        Notification.objects.mark_single_notification(
+            user.id, message_uid, True
+        )
+    else:
+        if request.method == 'POST':
+            msg_uuids = request.POST.getlist("uid")
+            Notification.objects.mark_bulk_msg_notifications(
+                user.id, msg_uuids, True)
+    messages.success(request, "Marked notifcation(s) as read")
+    return redirect(reverse("yaksh:view_notifications"))

@@ -1,4 +1,5 @@
 from django.conf.urls import url
+from django.urls import path
 from yaksh import views
 
 urlpatterns = [
@@ -205,4 +206,12 @@ urlpatterns = [
         views.course_teachers, name="course_teachers"),
     url(r'^manage/download/course/progress/(?P<course_id>\d+)',
         views.download_course_progress, name="download_course_progress"),
+    url(r'^manage/course/send/notifications/(?P<course_id>\d+)',
+        views.send_notifications, name="send_notifications"),
+    url(r'^view/notifications',
+        views.view_notifications, name="view_notifications"),
+    path('mark/notifications/<uuid:message_uid>',
+        views.mark_notification, name="mark_notification"),
+    path('mark/notifications',
+        views.mark_notification, name="mark_notification"),
 ]

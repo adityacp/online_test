@@ -13,6 +13,14 @@
         <div class="collapse navbar-collapse" id="navbarColor01">
         <ul class="navbar-nav mr-auto">
             <li class="nav-item"><a class="nav-link" href="{% url 'yaksh:index' %}"><i class="fa fa-home" style="size: 18px"></i>&nbsp;Home</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'yaksh:view_notifications' %}"><i class="fa fa-bell" style="size: 18px"></i>&nbsp;Notifications
+                {% if notifications_count > 0 %}
+                    <span class="badge badge-success badge-pill">
+                        {{notifications_count}}
+                    </span>
+                {% endif %}
+                </a>
+            </li>
         </ul>
         <ul class="navbar-nav ml-auto">
             <li class="nav-item dropdown my-lg-0" style="font-size: 1.2rem">
