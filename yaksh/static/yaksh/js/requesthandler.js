@@ -64,7 +64,11 @@ function response_handler(method_type, content_type, data, uid){
           if(method_type === "POST") {
               uid = res.uid;
           }
-          check_state(request_status, uid);
+          var code = global_editor.editor.getValue();
+          ws_data = {'code': code, 'kernel_id': kernel_id,
+                     'result': res}
+          lock_screen();
+          Socket.send(JSON.stringify(ws_data));
         }
         else{
           unlock_screen();
@@ -75,24 +79,6 @@ function response_handler(method_type, content_type, data, uid){
           var error_output = document.getElementById("error_panel");
           error_output.innerHTML = res.error;
           focus_on_error(error_output);
-          if(global_editor.editor){
-            err_lineno = $("#err_lineno").val();
-            if(marker){
-              marker.clear();
-            }
-            if(err_lineno){
-              var lineno = parseInt(err_lineno) - 1;
-              var editor = global_editor.editor;
-              var line_length = editor.getLine(lineno).length;
-              marker = editor.markText({line: lineno, ch: 0}, {line: lineno, ch: line_length},
-                                       {className: "activeline", clearOnEnter:true});
-              }
-            else{
-              if(marker){
-                marker.clear();
-              }
-            }
-          }
         }
     } else {
         reset_values();
@@ -118,6 +104,7 @@ function ajax_check_code(url, method_type, data_type, data, uid)
         "url": url,
         "data": data,
         "dataType": data_type,
+        "async": false,
         "beforeSend": function(xhr, settings) {
           if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
               xhr.setRequestHeader("X-CSRFToken", csrftoken);
@@ -143,8 +130,14 @@ function ajax_check_code(url, method_type, data_type, data, uid)
 
 var global_editor = {};
 var csrftoken = jQuery("[name=csrfmiddlewaretoken]").val();
-var err_lineno;
-var marker;
+
+var ws_scheme = window.location.protocol == "https:" ? "wss://" : "ws://";
+var Socket;
+
+$(window).on('unload', function() {
+  // do something
+  navigator.sendBeacon("http://127.0.0.1:9000/hub/api/info", "");
+});
 $(document).ready(function(){
   if(is_exercise == "True" && can_skip == "False"){
       setTimeout(function() {show_solution();}, delay_time*1000);
@@ -162,6 +155,26 @@ $(document).ready(function(){
     'bash': 'text/x-sh',
     'scilab': 'text/x-csrc',
     'r':'text/x-rsrc',
+  }
+
+  // Websocket to connect to Django Websocket
+  if(question_type === "code") {
+    Socket = new WebSocket(
+      ws_scheme + window.location.host + '/ws/quiz'
+    );
+    Socket.onmessage = function(e) {
+      unlock_screen();
+      const data = JSON.parse(e.data);
+      console.log(data.success)
+      var error_output = document.getElementById("error_panel");
+      error_output.innerHTML = data.response;
+      focus_on_error(error_output);
+    };
+
+    Socket.onclose = function(e) {
+      unlock_screen();
+      console.error('Chat socket closed unexpectedly');
+    };
   }
 
   // Code mirror Options
@@ -191,6 +204,7 @@ if (question_type == 'upload' || question_type == 'code') {
     var data = new FormData(document.getElementById("code"));
   }
     ajax_check_code($(this).attr("action"), "POST", "html", data, null)
+    // Socket.send(JSON.stringify({'message': data, 'kernel_id': kernel_id}));
     e.preventDefault(); // To stop the default form submission.
   });
   }

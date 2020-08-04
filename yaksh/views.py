@@ -1,5 +1,17 @@
+# Python Imports
 import os
 import csv
+import json
+from textwrap import dedent
+import zipfile
+from markdown import Markdown
+import re
+try:
+    from StringIO import StringIO as string_io
+except ImportError:
+    from io import BytesIO as string_io
+
+# Django Imports
 from django.http import HttpResponse, JsonResponse, HttpResponseRedirect
 from django.contrib.auth import login, logout, authenticate
 from django.shortcuts import render, get_object_or_404, redirect
@@ -16,19 +28,12 @@ from django.utils import timezone
 from django.core.exceptions import (
     MultipleObjectsReturned, ObjectDoesNotExist
 )
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.core.paginator import Paginator
 from django.contrib import messages
 from taggit.models import Tag
 from django.urls import reverse
-import json
-from textwrap import dedent
-import zipfile
-from markdown import Markdown
-try:
-    from StringIO import StringIO as string_io
-except ImportError:
-    from io import BytesIO as string_io
-import re
+from asgiref.sync import async_to_sync
+
 # Local imports.
 from yaksh.code_server import get_result as get_result_from_code_server
 from yaksh.models import (
@@ -54,6 +59,10 @@ from .send_emails import (send_user_mail,
 from .decorators import email_verified, has_profile
 from .tasks import regrade_papers
 from notifications_plugin.models import Notification
+from hub_evaluator.hub_client import HubClient
+from hub_evaluator.models import Authentication, Kernels
+from hub_evaluator.hub_settings import KERNEL_MAPPER
+
 
 
 def my_redirect(url):
@@ -568,6 +577,10 @@ def start(request, questionpaper_id=None, attempt_num=None, course_id=None,
 
     if last_attempt:
         if last_attempt.is_attempt_inprogress():
+            # code_questions = last_attempt.questions.filter(
+            #     type="code").values_list("language", flat=True)
+            # if code_questions:
+            #     _start_hub_server(code_questions, user)
             return show_question(
                 request, last_attempt.current_question(), last_attempt,
                 course_id=course_id, module_id=module_id,
@@ -605,6 +618,10 @@ def start(request, questionpaper_id=None, attempt_num=None, course_id=None,
             raise Http404(msg)
         new_paper = quest_paper.make_answerpaper(user, ip, attempt_number,
                                                  course_id)
+        code_questions = new_paper.questions.filter(type="code").values_list(
+            "language", flat=True)
+        if code_questions:
+            _start_hub_server(code_questions, user)
         if new_paper.status == 'inprogress':
             return show_question(
                 request, new_paper.current_question(),
@@ -614,6 +631,22 @@ def start(request, questionpaper_id=None, attempt_num=None, course_id=None,
         else:
             msg = 'You have already finished the quiz!'
             raise Http404(msg)
+
+
+def _start_hub_server(code_questions, user):
+    auth_token = Authentication.objects.filter(user=user).last()
+    hc = HubClient(token=auth_token.token)
+    async_to_sync(hc.start_user_server)(user.username)
+    created_kernels = []
+    for language in set(code_questions):
+        response = async_to_sync(hc.start_user_kernel)(
+            user.username, KERNEL_MAPPER.get(language)
+        )
+        created_kernels.append(
+            Kernels(user=user, kernel_id=response.get("id"),
+                    kernel_name=response.get("name"))
+            )
+    Kernels.objects.bulk_create(created_kernels)
 
 
 @login_required
@@ -670,6 +703,12 @@ def show_question(request, question, paper, error_message=None,
     course = Course.objects.get(id=course_id)
     module = course.learning_module.get(id=module_id)
     all_modules = course.get_learning_modules()
+    kernel_id = None
+    if question.type == "code":
+        name = KERNEL_MAPPER.get(question.language)
+        kernel_id = Kernels.objects.filter(
+            user=request.user, kernel_name=name
+        ).last().kernel_id
     context = {
         'question': question,
         'paper': paper,
@@ -684,6 +723,7 @@ def show_question(request, question, paper, error_message=None,
         'can_skip': can_skip,
         'delay_time': delay_time,
         'quiz_type': quiz_type,
+        'kernel_id': kernel_id,
         'all_modules': all_modules,
     }
     answers = paper.get_previous_answers(question)
@@ -842,23 +882,23 @@ def check(request, q_id, attempt_num=None, questionpaper_id=None,
         # If we were not skipped, we were asked to check.  For any non-mcq
         # questions, we obtain the results via XML-RPC with the code executed
         # safely in a separate process (the code_server.py) running as nobody.
-        json_data = current_question.consolidate_answer_data(
-            user_answer, user) if current_question.type == 'code' or \
-            current_question.type == 'upload' else None
+        # json_data = current_question.consolidate_answer_data(
+        #     user_answer, user) if current_question.type == 'code' or \
+        #     current_question.type == 'upload' else None
         result = paper.validate_answer(
-            user_answer, current_question, json_data, uid
+            user_answer, current_question, None, uid
         )
         if current_question.type in ['code', 'upload']:
             if (paper.time_left() <= 0 and not
                     paper.question_paper.quiz.is_exercise):
-                url = '{0}:{1}'.format(SERVER_HOST_NAME, SERVER_POOL_PORT)
-                result_details = get_result_from_code_server(url, uid,
-                                                             block=True)
-                result = json.loads(result_details.get('result'))
-                next_question, error_message, paper = _update_paper(
-                    request, uid, result)
-                return show_question(request, next_question, paper,
-                                     error_message, course_id=course_id,
+                # url = '{0}:{1}'.format(SERVER_HOST_NAME, SERVER_POOL_PORT)
+                # result_details = get_result_from_code_server(url, uid,
+                #                                              block=True)
+                # result = json.loads(result_details.get('result'))
+                # next_question, error_message, paper = _update_paper(
+                #     request, uid, result)
+                return show_question(request, None, paper,
+                                     None, course_id=course_id,
                                      module_id=module_id,
                                      previous_question=current_question)
             else:
@@ -982,6 +1022,13 @@ def complete(request, reason=None, attempt_num=None, questionpaper_id=None,
 
         paper.update_marks()
         paper.set_end_time(timezone.now())
+        auth_token = Authentication.objects.filter(user=user).last()
+        hc = HubClient(token=auth_token.token)
+        kernels = Kernels.objects.filter(user=user)
+        for kernel_id in kernels.values_list("kernel_id", flat=True):
+            async_to_sync(hc.remove_user_kernel)(user.username, kernel_id)
+        kernels.delete()
+        async_to_sync(hc.stop_user_server)(user.username)
         message = reason or "Quiz has been submitted"
         context = {'message': message, 'paper': paper,
                    'module_id': learning_module.id,
@@ -3051,6 +3098,15 @@ def course_modules(request, course_id, msg=None):
     if not course.active or not course.is_active_enrollment():
         msg = "{0} is either expired or not active".format(course.name)
         return quizlist_user(request, msg=msg)
+    hub_auth_exists = Authentication.objects.filter(user=user).exists()
+    if not hub_auth_exists:
+        hc = HubClient()
+        async_to_sync(hc.create_user)(user.username)
+        response = async_to_sync(hc.create_token)(user.username)
+        if response.get("token"):
+            Authentication.objects.get_or_create(
+                token=response.get("token"), user=user
+            )
     learning_modules = course.get_learning_modules()
     context = {"course": course, "user": user, "msg": msg}
     course_status = CourseStatus.objects.filter(course=course, user=user)

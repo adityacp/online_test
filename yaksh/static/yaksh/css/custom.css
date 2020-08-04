@@ -129,5 +129,5 @@ body, .dropdown-menu {
     Quiz question style
 ----------------------------------------------------- */
 #question_card {
-    border: none;
+    border-color: none;
 }

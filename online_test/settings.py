@@ -51,7 +51,9 @@ INSTALLED_APPS = (
     'rest_framework',
     'api',
     'corsheaders',
-    'rest_framework.authtoken'
+    'rest_framework.authtoken',
+    'channels',
+    'hub_evaluator'
 )
 
 MIDDLEWARE = (
@@ -72,6 +74,7 @@ ROOT_URLCONF = 'online_test.urls'
 
 WSGI_APPLICATION = 'online_test.wsgi.application'
 
+ASGI_APPLICATION = 'online_test.routing.application'
 
 # Database
 # https://docs.djangoproject.com/en/1.6/ref/settings/#databases
@@ -166,7 +169,7 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'APP_DIRS': True,
-        'DIRS': ['yaksh/templates'],
+        'DIRS': ['yaksh/templates', 'hub_evaluator/templates'],
         'OPTIONS': {
             'context_processors': [
                 'django.contrib.auth.context_processors.auth',
@@ -245,3 +248,20 @@ REST_FRAMEWORK = {
 
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
+
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'my_cache_table',
+    }
+}

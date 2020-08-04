@@ -1,4 +1,3 @@
--r requirements-codeserver.txt
 invoke==0.21.0
 django==3.0.3
 django-taggit==1.2.0
@@ -11,10 +10,16 @@ ruamel.yaml==0.16.10
 markdown==2.6.9
 pygments==2.2.0
 celery==4.4.2
-redis==3.4.1
+redis==3.5.0
 notifications-plugin==0.1.2
 django-celery-beat==2.0.0
 django-celery-results==1.2.1
 djangorestframework==3.11.0
 django-cors-headers==3.1.0
 Pillow
+channels==2.4.0
+channels-redis==2.4.2
+Twisted[tls,http2]
+aiohttp==3.6.2
+websockets==8.1
+ws4py
